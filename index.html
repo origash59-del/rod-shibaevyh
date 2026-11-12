@@ -3,6 +3,8 @@
 <title>Род Шибаевых и Павловых</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kurale&amp;family=Nunito:wght@400;600;700&amp;display=swap">
 <style>
 :root{
@@ -748,10 +750,10 @@ let drag=null,moveMode=false,justDragged=false;const undoStack=[];
 $("#undoBtn").onclick=async()=>{const last=undoStack.pop();if(!last)return;$("#undoBtn").hidden=!undoStack.length;
   const upd=last.map(([id,ox,oy])=>{if(!people.has(id))return null;const p=clone(P(id));if(ox)p.ox=ox;else delete p.ox;if(oy)p.oy=oy;else delete p.oy;if(ox||oy)p.lv=LV;people.set(id,p);return[id,p]}).filter(Boolean);
   render();
-  try{if(db){const b=db.batch();for(const [id,p] of upd)b.set(db.doc("people/"+id),p);await b.commit()}}catch(e){$("#offline").hidden=false;$("#offline").textContent="Не получилось отменить. Проверьте соединение."}};
+  try{if(db){const b=db.batch();for(const [id,p] of upd)b.set(db.doc(COL+"/"+id),p);await b.commit()}}catch(e){$("#offline").hidden=false;$("#offline").textContent="Не получилось отменить. Проверьте соединение."}};
 $("#canvas").addEventListener("click",e=>{if(justDragged){justDragged=false;return}const c=e.target.closest(".card");if(c&&!moveMode)openDetails(c.dataset.id)});
 $("#moveBtn").onclick=async()=>{
-  
+  if(!moveMode&&db&&!(await unlock()))return;
   moveMode=!moveMode;$("#moveBtn").setAttribute("aria-pressed",moveMode);$("#moveBtn").textContent=moveMode?"Готово":"Двигать карточки";
   $("#stage").classList.toggle("moving",moveMode);
   $("#moveHint").hidden=!moveMode};
@@ -782,7 +784,7 @@ window.addEventListener("pointerup",async()=>{if(!drag)return;const d=drag;drag=
   const upd=d.ids.map(id=>{const p=clone(P(id));p.ox=base[id][0]+dx;p.oy=base[id][1]+dy;p.lv=LV;people.set(id,p);return[id,p]});
   render();
   // save the whole couple in one go, so the database never holds one spouse moved and the other not
-  try{if(db){const b=db.batch();for(const [id,p] of upd)b.set(db.doc("people/"+id),p);await b.commit()}}catch(e){$("#offline").hidden=false;$("#offline").textContent="Не получилось сохранить новое место карточки. Проверьте соединение."}});
+  try{if(db){const b=db.batch();for(const [id,p] of upd)b.set(db.doc(COL+"/"+id),p);await b.commit()}}catch(e){$("#offline").hidden=false;$("#offline").textContent="Не получилось сохранить новое место карточки. Проверьте соединение."}});
 $("#zin").onclick=()=>{zoom=Math.min(1.6,+(zoom+.15).toFixed(2));render()};
 $("#zout").onclick=()=>{zoom=Math.max(.4,+(zoom-.15).toFixed(2));render()};
 
@@ -821,8 +823,8 @@ function openDetails(id){
   s.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>openDetails(b.dataset.go));
   s.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>openForm(b.dataset.add,id));
   s.querySelector("[data-edit]").onclick=()=>openForm("edit",id);
-  const rs=s.querySelector("[data-reset]");if(rs)rs.onclick=async()=>{try{const upd=unitWith(id).map(m=>{const q=clone(P(m));delete q.ox;delete q.oy;delete q.lv;people.set(m,q);return[m,q]});render();
-    if(db){const b=db.batch();for(const [m,q] of upd)b.set(db.doc("people/"+m),q);await b.commit()}openDetails(id)}catch(e){}};
+  const rs=s.querySelector("[data-reset]");if(rs)rs.onclick=async()=>{try{if(db&&!(await unlock()))return;const upd=unitWith(id).map(m=>{const q=clone(P(m));delete q.ox;delete q.oy;delete q.lv;people.set(m,q);return[m,q]});render();
+    if(db){const b=db.batch();for(const [m,q] of upd)b.set(db.doc(COL+"/"+m),q);await b.commit()}openDetails(id)}catch(e){}};
   s.querySelector("[data-del]").onclick=()=>{
     $("#delRow").innerHTML=`<span>Удалить ${esc(shortName(p))} и все связи?</span><button class="btn danger solid" id="delYes">Удалить</button><button class="btn" id="delNo">Отмена</button>`;
     $("#delYes").onclick=()=>removePerson(id);$("#delNo").onclick=()=>openDetails(id)};
@@ -879,7 +881,7 @@ function openForm(mode,id){
 
 /* ---------- data ---------- */
 const newId=()=>"p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-async function put(id,body){people.set(id,body);render();if(db)await db.doc("people/"+id).set(body)}
+async function put(id,body){if(db&&!(await unlock()))throw new Error("locked");people.set(id,body);render();if(db)await db.doc(COL+"/"+id).set(body)}
 const clone=o=>JSON.parse(JSON.stringify(o));
 async function save(mode,id,data){
   const t=clone(P(id));
@@ -903,17 +905,37 @@ async function save(mode,id,data){
   openDetails(nid);
 }
 async function removePerson(id){
-  try{
+  try{if(db&&!(await unlock()))throw new Error("locked");
     for(const [k,p] of people){if(k===id)continue;
       if(arr(p.parents).includes(id)||arr(p.spouses).includes(id)){const c=clone(p);c.parents=arr(c.parents).filter(x=>x!==id);c.spouses=arr(c.spouses).filter(x=>x!==id);await put(k,c)}}
-    people.delete(id);if(db)await db.doc("people/"+id).delete();
+    people.delete(id);if(db)await db.doc(COL+"/"+id).delete();
     closeSheet();
   }catch(e){$("#delRow").innerHTML=`<p class="err">Не получилось удалить. Попробуйте ещё раз.</p>`}
 }
 
-(()=>{
-  people=new Map(Object.entries(clone(SEED)));
-  const o=$("#offline");o.hidden=false;o.textContent="Правки на этой странице видны только до её закрытия. Чтобы сохранить их, нажмите «Скачать копию древа»: получится новый файл со всеми изменениями.";
-  render();
+/* ---------- shared online base: everyone sees the same tree; saving asks for the family password ---------- */
+const COL="shibaev_people";
+const firebaseConfig={apiKey:"AIzaSyAr5-WtiqcLN3JlImi1Uc59ErA3kJRrnfA",authDomain:"pavlov-tree.firebaseapp.com",projectId:"pavlov-tree",storageBucket:"pavlov-tree.firebasestorage.app",messagingSenderId:"929209033125",appId:"1:929209033125:web:dcef930441230c2b17084c"};
+const PASS_HASH="9176f5c59b7d800966c6d4648c2a7fd6a1790cf4df8325e02bcd47080d6023f9";
+async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+async function unlock(){try{if(localStorage.getItem("shib-tree-ok")==="1")return true}catch(e){}
+  const t=prompt("Чтобы сохранить правки, введите семейный пароль:");if(t==null)return false;
+  if(await sha(t.trim().toLowerCase())===PASS_HASH){try{localStorage.setItem("shib-tree-ok","1")}catch(e){}return true}
+  alert("Пароль не подошёл. Спросите его у Ольги.");return false}
+(async()=>{
+  let d=null;
+  try{firebase.initializeApp(firebaseConfig);d=firebase.firestore()}catch(e){}
+  const o=$("#offline");
+  if(!d){people=new Map(Object.entries(clone(SEED)));o.hidden=false;o.textContent="Не удалось подключиться к базе. Показана сохранённая копия древа, правки сейчас не сохранятся.";render();return}
+  db=d;let seeding=false,first=true;
+  db.collection(COL).onSnapshot(async s=>{
+    if(s.empty&&!seeding){seeding=true;people=new Map(Object.entries(clone(SEED)));render();
+      try{const ent=Object.entries(SEED);for(let i=0;i<ent.length;i+=400){const b=db.batch();for(const [id,p] of ent.slice(i,i+400))b.set(db.doc(COL+"/"+id),p);await b.commit()}}catch(e){o.hidden=false;o.textContent="Не удалось записать древо в базу. Проверьте правила Firestore."}
+      return}
+    people=new Map(s.docs.map(x=>[x.id,x.data()]));o.hidden=true;
+    if(selected&&!people.has(selected)){closeSheet();return}
+    render();first=false;
+    if(selected&&sheetMode==="details")openDetails(selected);
+  },()=>{people=new Map(Object.entries(clone(SEED)));render();o.hidden=false;o.textContent="Не удалось подключиться к базе. Показана сохранённая копия древа, правки сейчас не сохранятся. Обновите страницу позже."});
 })();
 </script></body></html>
