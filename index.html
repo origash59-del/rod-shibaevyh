@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Род Шибаевых и Павловых</title>
+<title>Семейное древо Ольги</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -134,7 +134,7 @@ textarea{min-height:70px;resize:vertical}
   <header>
     <div class="brand">
       <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><path d="M27 2l25 25-25 25L2 27z" fill="#A3131B"></path><path d="M27 10l17 17-17 17-17-17z" fill="#fff"></path><path d="M27 15l12 12-12 12-12-12z" fill="#A3131B"></path><path d="M27 21l6 6-6 6-6-6z" fill="#fff"></path><path d="M27 24l3 3-3 3-3-3z" fill="#231A1A"></path><path d="M27 2v8M27 44v8M2 27h8M44 27h8" stroke="#231A1A" stroke-width="2"></path></svg>
-      <div><h1>Род <em>Шибаевых</em> и <em>Павловых</em></h1>
+      <div><h1>Семейное древо <em>Ольги</em></h1>
       <p class="sub" id="stats">Загружаю древо…</p></div>
     </div>
     <div class="tools">
@@ -655,7 +655,7 @@ function buildPrint(fmt){
   $("#pageStyle")?.remove();const st=document.createElement("style");st.id="pageStyle";st.textContent=`@page{size:${sw}mm ${sh}mm;margin:${MARGIN}mm}`;document.head.appendChild(st);
   const d=new Date();const date=d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
   let html=`<div class="ps-page" style="width:${pl.pw}mm;height:${pl.ph-0.5}mm"><div class="ps-inner" style="width:${pl.w}px;zoom:${pl.k};left:${((pl.pw*MM-pl.w*pl.k)/2)/pl.k}px;top:${Math.max(0,((pl.ph*MM-pl.h*pl.k)/2)/pl.k)}px">
-    <div class="ps-head" style="height:${pl.HEAD-18}px"><h1>Род <em style="color:var(--accent)">Шибаевых</em> и <em style="color:var(--accent)">Павловых</em></h1><span>${people.size} ${plural(people.size,"человек","человека","человек")} · ${date}</span></div>`;
+    <div class="ps-head" style="height:${pl.HEAD-18}px"><h1>Семейное древо <em style="color:var(--accent)">Ольги</em></h1><span>${people.size} ${plural(people.size,"человек","человека","человек")} · ${date}</span></div>`;
   pl.strips.forEach(([a,b],i)=>{html+=`<div class="ps-strip" style="width:${b-a}px;height:${pl.TH}px;margin-top:${i?pl.SGAP:0}px">
     ${pl.strips.length>1?`<span class="ps-tag">${i+1} / ${pl.strips.length}${i<pl.strips.length-1?" →":""}</span>`:""}
     <canvas data-a="${a}" width="${Math.round((b-a)*2)}" height="${Math.round(pl.TH*2)}" style="width:${b-a}px;height:${pl.TH}px"></canvas>
@@ -716,7 +716,7 @@ async function saveImage(fmt){
   // header
   const d=new Date();const date=d.toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"});
   x.fillStyle="#231A1A";x.font='600 56px Kurale, Georgia, serif';x.textBaseline="alphabetic";let hx=6;
-  for(const [t,col] of [["Род ","#231A1A"],["Шибаевых","#A3131B"],[" и ","#231A1A"],["Павловых","#A3131B"]]){x.fillStyle=col;x.fillText(t,hx,58);hx+=x.measureText(t).width}
+  for(const [t,col] of [["Семейное древо ","#231A1A"],["Ольги","#A3131B"]]){x.fillStyle=col;x.fillText(t,hx,58);hx+=x.measureText(t).width}
   x.font='400 20px Nunito, Arial, sans-serif';x.fillStyle="#6B5150";const info=`${people.size} ${plural(people.size,"человек","человека","человек")} · ${date}`;x.textAlign="right";x.fillText(info,pl.w-6,58);x.textAlign="left";
   ornBand(x,0,pl.HEAD-34,pl.w,22);
   const bg=$("#treebg"),sc=bg.width/PAGE.width,lines=await svgImage();
